@@ -1,0 +1,304 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    
+
+
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<meta charset="UTF-8">
+		<title>SQLite and Flask</title>
+
+		<!-- Load Leaflet -->
+		<link rel="stylesheet" href="https://unpkg.com/leaflet@1.4.0/dist/leaflet.css"/>
+		<script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js"></script>
+		<!-- To delete markers -->
+		<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+		
+        <style>
+            .button {
+                background-color: rgb(114, 114, 114);
+                border: none;
+                color: whitesmoke;
+                padding: 8px 20px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 16px;
+                margin: 4px 2px;
+                cursor: pointer;
+            }
+            </style>
+
+	</head>
+
+<body>
+
+
+		
+
+    <!-- forms to control database actions -->
+    <h3 style="color: whitesmoke;">Add a story to the database</h3>
+    <label for="story" style="color: whitesmoke;">story:</label><input id="story" type="text" />
+
+    <label for="longitude" style="color: whitesmoke;">Longitude:</label><input id="insert_longitude" type="text" value="-2.807007"/>
+    <label for="latitude" style="color: whitesmoke;">Latitude:</label><input id="insert_latitude" type="text" value="54.065836"/>
+    <button class="button" onclick="makeRequest('./insert?lng=' + document.getElementById('insert_longitude').value.toString() + 
+        '&lat=' + document.getElementById('insert_latitude').value.toString()+'&story=' + document.getElementById('story').value.toString(),
+        loadInsertResponse)"> >Submit</button>
+    <br>
+
+    <hr>
+    
+    <!-- div to write outputs -->
+    <div id="db_response"></div>
+
+    <script>
+        /**
+         * Make a request for JSON over HTTP, pass resulting text to callback when ready
+         */
+        function makeRequest(url, callback) {
+
+            //initialise the XMLHttpRequest object
+            var httpRequest = new XMLHttpRequest();
+
+            //set an event listener for when the HTTP state changes
+            httpRequest.onreadystatechange = function () {
+
+                //if it works, parse the JSON and pass to the callback
+                //a successful HTTP request returns a state of DONE and a status of 200
+                if (httpRequest.readyState === XMLHttpRequest.DONE && httpRequest.status === 200) {
+                    callback(JSON.parse(httpRequest.responseText));
+                }
+            };
+
+            //prepare and send the request
+            httpRequest.open('GET', url);
+            httpRequest.send();
+        }
+
+        /**
+         * Parse a response and load into div
+         */ 
+        function loadSelectAllResponse(data){
+
+            console.log(data);
+
+            // lazily load data into html and dump onto page
+            let output = "";
+            for (let i = 0; i < data.length; i++){
+                output += '<p>' + data[i].lng + ', ' + data[i].lat + '</p>';
+            }
+            document.getElementById('db_response').innerHTML = output;
+        }
+
+        /**
+         * Parse a response and load into div
+         */ 
+        function loadInsertResponse(data){
+
+            console.log(data);
+
+            // lazily load data into html and dump onto page
+            document.getElementById('db_response').innerHTML = '<p>' + data.success + '</p>';
+        }
+
+        /**
+         * Parse a response and load into div
+         */ 
+        function loadSelectOneResponse(data){
+
+            console.log(data);
+
+            // lazily load data into html and dump onto page
+            document.getElementById('db_response').innerHTML = '<p>' + data.lng + ', ' + data.lat + '</p>';
+        }
+    </script>
+
+            
+
+
+            <style>
+    
+                /* Style the map */
+                #map {
+                    width:  1900px;
+                    height: 820px;
+                }
+            </style>
+        </head>
+    
+        <body onload='initMap()'>
+
+
+    
+            <!-- This is where the map will go -->
+            <div id='map'></div>
+
+
+    
+            <script>
+    
+                //setup global variables
+                let map, start, end, routeLayer;  // REMOVE start, end, routeLayer
+                
+
+                /**
+                 * Initialise the Map
+                 */
+                function initMap(){
+                    //sample data values for populate map
+                    var data = [
+                        {"loc":[53.484220,-2.235480], "title":"yellow"},
+                        {"loc":[53.484076,-2.237332], "title":"black"},
+                        {"loc":[53.483652,-2.235030], "title":"blue"},
+                        {"loc":[53.477002,-2.236600], "title":"silver"},
+                        {"loc":[53.473867,-2.240346], "title":"coral"},
+                        {"loc":[41.219190,13.062145], "title":"cyan"},
+                        {"loc":[41.344190,13.242145], "title":"darkblue"},	
+                        {"loc":[41.679190,13.122145], "title":"darkred"},
+                        {"loc":[41.329190,13.192145], "title":"darkgray"},
+                        {"loc":[41.379290,13.122545], "title":"dodgerblue"},
+                        {"loc":[41.409190,13.362145], "title":"gray"},
+                        {"loc":[41.794008,12.583884], "title":"green"},	
+                        {"loc":[41.805008,12.982884], "title":"greenyellow"},
+                        {"loc":[41.536175,13.273590], "title":"red"},
+                        {"loc":[41.516175,13.373590], "title":"rosybrown"},
+                        {"loc":[41.506175,13.173590], "title":"royalblue"},
+                        {"loc":[41.836175,13.673590], "title":"salmon"},
+                        {"loc":[41.796175,13.570590], "title":"seagreen"},
+                        {"loc":[41.436175,13.573590], "title":"seashell"},
+                        {"loc":[41.336175,13.973590], "title":"silver"},
+                        {"loc":[41.236175,13.273590], "title":"skyblue"},
+                        {"loc":[41.546175,13.473590], "title":"yellow"},
+                        {"loc":[41.239190,13.032145], "title":"white"}
+                    ];
+
+                    // creates a world map (centre where the equator crosses the GPM)
+                    const mapCentre = L.latLng(53.4808,-2.2426);
+                    
+                    map = L.map('map').setView(mapCentre,16);
+
+                    map.addLayer(new L.TileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'));	//base layer
+                    /*
+                    // Add the OpenStreetMap background tile
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors. Geocoding by <a href="https://nominatim.org">Nominatim</a>.Routing by <a href="https://openrouteservice.org/">OpenRouteService</a>'
+                    }).addTo(map);
+                    */
+                    
+                    // Add a scale to the map
+                    L.control.scale().addTo(map);
+
+                    var popup = L.popup();
+
+
+    /*-------------------------------------------------------------------------------------------------------
+    // CREATING MARKERS
+    */
+    // Script for adding marker on map click
+    function onMapClick(e) {
+
+    var geojsonFeature = {
+        "type": "Feature",
+            "properties": {},
+            "geometry": {
+                "type": "Point",
+                "coordinates": [e.latlng.lat, e.latlng.lng]
+        }
+    }
+
+    var marker;
+
+    L.geoJson(geojsonFeature, {
+        
+        pointToLayer: function(feature, latlng){
+            
+            marker = L.marker(e.latlng, {
+                
+                title: "Resource Location",
+                alt: "Resource Location",
+                riseOnHover: true,
+                draggable: true,
+
+            }).bindPopup("<input type='button' value='Delete this marker' class='marker-delete-button'/>");
+
+            marker.on("popupopen", onPopupOpen);
+    
+            return marker;
+        }
+    }).addTo(map);
+
+    var lat = e.latlng.lat;
+    var lng = e.latlng.lng;
+    document.getElementById('insert_latitude').value = lat;
+    document.getElementById('insert_longitude').value = lng;
+    };
+
+/*					
+// var newMarker
+  function onMapClick(e) {
+    // add a draggable marker
+    var newMarker = new L.marker(e.latlng, {
+            title: "Resource Location",
+            alt: "Resource Location",
+            riseOnHover: true,
+            draggable: true,
+        }).addTo(map);
+
+    
+
+   
+    var lat = e.latlng.lat;
+    var lng = e.latlng.lng;
+    document.getElementById('insert_latitude').value = lat;
+    document.getElementById('insert_longitude').value = lng;
+
+    popup
+      .setLatLng(e.latlng)
+    .setContent("<input type='button' value='Delete this marker' class='marker-delete-button'/>")   // "You clicked the map at " + e.latlng.toString()     would be good to add a number after the story
+      .openOn(map);
+
+    
+     
+     
+  }
+  */
+
+      // Function to handle delete as well as other events on marker popup open
+    function onPopupOpen() {
+
+    var tempMarker = this;
+
+    //var tempMarkerGeoJSON = this.toGeoJSON();
+
+    //var lID = tempMarker._leaflet_id; // Getting Leaflet ID of this marker
+
+    // To remove marker on click of delete
+    $(".marker-delete-button:visible").click(function () {
+        map.removeLayer(tempMarker);
+    });
+    }
+
+
+  map.on('click', onMapClick);
+ 
+
+  // map.removeLayer(newMarker);
+  
+}
+
+
+                
+    
+    
+
+            </script>
+    
+</body>
+
+</html>
+
+{% endblock %}
